@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <!-- スマホ幅に合わせる。viewport-fit=cover でノッチ端末でも端まで表示 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- アドレスバー等の色（アプリらしい見た目に） -->
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="description" content="a×b×c+d / j×k×l−m を満たす数字の組をすべて検索するツール" />
+
+  <!-- PWA マニフェスト（相対パス：GitHub Pages のサブディレクトリでも動く） -->
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- iOS / ホーム画面用アイコン -->
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="数式検索" />
+
+  <title>数式組合せ検索ツール</title>
+
+  <style>
+    /* ===== 基本設定（モバイルファースト） ===== */
+    :root {
+      --primary: #4f46e5;      /* メインカラー（インディゴ） */
+      --primary-dark: #4338ca;
+      --bg: #f1f5f9;           /* 背景 */
+      --card: #ffffff;         /* カード背景 */
+      --text: #0f172a;         /* 文字色 */
+      --muted: #64748b;        /* 補助文字 */
+      --border: #e2e8f0;
+      --error: #dc2626;
+      --add: #2563eb;          /* 式1（足し算）アクセント */
+      --sub: #0d9488;          /* 式2（引き算）アクセント */
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+                   "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      /* ノッチ端末の安全領域を確保 */
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .wrap {
+      max-width: 560px;       /* PC でも読みやすい幅に制限 */
+      margin: 0 auto;
+      padding: 16px 16px 48px;
+    }
+
+    /* ===== ヘッダー ===== */
+    header { text-align: center; padding: 12px 0 4px; }
+    header h1 {
+      font-size: 1.3rem;
+      margin: 0 0 4px;
+      color: var(--primary-dark);
+    }
+    header p {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .formulas {
+      margin: 10px 0 4px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: #eef2ff;
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .formulas span { display: inline-block; white-space: nowrap; }
+
+    /* ===== 入力エリア ===== */
+    .panel {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    label.field-label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+    .input-row { display: flex; gap: 10px; }
+    #numberInput {
+      flex: 1;
+      min-width: 0;
+      height: 60px;                /* 指で押しやすい大きさ */
+      font-size: 1.5rem;           /* 16px 以上で入力時の自動ズームを防止 */
+      text-align: center;
+      padding: 0 12px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text);
+    }
+    #numberInput:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79,70,229,.18);
+    }
+    #searchBtn {
+      flex: 0 0 auto;
+      min-width: 96px;
+      height: 60px;                /* ボタンも大きく */
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      background: var(--primary);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    #searchBtn:active { background: var(--primary-dark); transform: translateY(1px); }
+
+    .hint { margin: 8px 2px 0; font-size: 0.8rem; color: var(--muted); }
+
+    /* ===== エラー表示 ===== */
+    .error {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--error);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .hidden { display: none; }
+
+    /* ===== 結果表示 ===== */
+    .result-input {
+      margin: 18px 2px 6px;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .none-banner {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .cat {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px 14px 6px;
+      margin-top: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      border-top: 5px solid var(--add);
+    }
+    .cat.sub { border-top-color: var(--sub); }
+    .cat h2 {
+      font-size: 1.02rem;
+      margin: 0 0 2px;
+    }
+    .cat.add h2 { color: var(--add); }
+    .cat.sub h2 { color: var(--sub); }
+    .count {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0 0 8px;
+      font-weight: 600;
+    }
+    ol.results {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      counter-reset: item;
+    }
+    ol.results li {
+      counter-increment: item;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 9px 4px;
+      border-top: 1px solid var(--border);
+      font-size: 1.08rem;
+      /* 数式は等幅寄りで桁を揃える */
+      font-variant-numeric: tabular-nums;
+    }
+    ol.results li::before {
+      content: counter(item);
+      flex: 0 0 auto;
+      min-width: 1.6em;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    ol.results li .expr { white-space: nowrap; overflow-x: auto; }
+    .empty-cat { color: var(--muted); padding: 6px 4px 12px; font-size: 0.95rem; }
+
+    footer {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <h1>数式組合せ検索ツール</h1>
+      <p>0〜999 の整数を入れて、条件を満たす組をすべて検索します</p>
+      <div class="formulas">
+        <span>① a × b × c ＋ d</span>　/　<span>② j × k × l － m</span><br />
+        <small>各数字は 1〜9 / 同じ式の中で重複なし</small>
+      </div>
+    </header>
+
+    <!-- 入力フォーム：submit で Enter キー検索にも対応
+         novalidate: ブラウザ標準の検証を無効化し、独自の日本語エラーを必ず表示する
+         （pattern/inputmode は数字キーボード表示のためだけに残す） -->
+    <form id="searchForm" class="panel" autocomplete="off" novalidate>
+      <label class="field-label" for="numberInput">入力値（0〜999）</label>
+      <div class="input-row">
+        <!-- inputmode="numeric" でスマホの数字キーボードを表示 -->
+        <input
+          id="numberInput"
+          name="numberInput"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          maxlength="3"
+          placeholder="例: 65"
+          aria-label="入力値（0〜999の整数）"
+        />
+        <button id="searchBtn" type="submit">検索</button>
+      </div>
+      <p class="hint">数字を入力して「検索」または Enter キーを押してください。</p>
+    </form>
+
+    <!-- エラー表示 -->
+    <div id="error" class="error hidden" role="alert"></div>
+
+    <!-- 検索結果 -->
+    <section id="results" aria-live="polite"></section>
+
+    <footer>
+      オフライン対応・ホーム画面に追加できます（PWA）
+    </footer>
+  </div>
+
+  <script>
+    "use strict";
+
+    /* =========================================================
+       検索ロジック
+       - 1〜9 から掛け算用の異なる3個を「組合せ」で選ぶ（a<b<c）
+         → 順番違いの重複が原理的に発生しない
+       - 残りの加算/減算用の数字は、掛け算の3個と異なるものだけ
+       - ループが昇順なので、結果は (a,b,c,最後の数) の昇順で並ぶ
+       ========================================================= */
+    var MIN = 1, MAX = 9;
+
+    // 式1: a × b × c + d = target
+    function searchAdd(target) {
+      var results = [];
+      for (var a = MIN; a <= MAX; a++) {
+        for (var b = a + 1; b <= MAX; b++) {           // b>a で組合せ
+          for (var c = b + 1; c <= MAX; c++) {         // c>b で組合せ
+            var product = a * b * c;
+            for (var d = MIN; d <= MAX; d++) {
+              if (d === a || d === b || d === c) continue; // 重複禁止
+              if (product + d === target) {
+                results.push({ a: a, b: b, c: c, x: d });
+              }
+            }
+          }
+        }
+      }
+      return results;
+    }
+
+    // 式2: j × k × l − m = target
+    function searchSub(target) {
+      var results = [];
+      for (var j = MIN; j <= MAX; j++) {
+        for (var k = j + 1; k <= MAX; k++) {
+          for (var l = k + 1; l <= MAX; l++) {
+            var product = j * k * l;
+            for (var m = MIN; m <= MAX; m++) {
+              if (m === j || m === k || m === l) continue; // 重複禁止
+              if (product - m === target) {
+                results.push({ a: j, b: k, c: l, x: m });
+              }
+            }
+          }
+        }
+      }
+      return results;
+    }
+
+    /* =========================================================
+       入力チェック
+       - 空欄 / 小数 / 文字列 / 負の数 / 1000以上 をエラーに
+       ========================================================= */
+    function validate(raw) {
+      var s = (raw == null ? "" : String(raw)).trim();
+      if (s === "") {
+        return { ok: false, msg: "数字が入力されていません。0〜999 の整数を入力してください。" };
+      }
+      if (/^[+-]/.test(s)) {
+        return { ok: false, msg: "0〜999 の整数を入力してください（マイナスや符号は使えません）。" };
+      }
+      if (s.indexOf(".") !== -1 || /[eE]/.test(s)) {
+        return { ok: false, msg: "整数を入力してください（小数は使えません）。" };
+      }
+      if (!/^\d+$/.test(s)) {
+        return { ok: false, msg: "数字だけを入力してください（文字や記号は使えません）。" };
+      }
+      var n = parseInt(s, 10);
+      if (n > 999) {
+        return { ok: false, msg: "999 以下の数を入力してください。" };
+      }
+      // ここまで来れば 0〜999 の整数
+      return { ok: true, value: n };
+    }
+
+    /* =========================================================
+       表示
+       ========================================================= */
+    var MUL = "×";   // ×
+    var MINUS = "−"; // −（見やすいマイナス記号）
+
+    function fmtAdd(r, target) {
+      return r.a + " " + MUL + " " + r.b + " " + MUL + " " + r.c + " + " + r.x + " = " + target;
+    }
+    function fmtSub(r, target) {
+      return r.a + " " + MUL + " " + r.b + " " + MUL + " " + r.c + " " + MINUS + " " + r.x + " = " + target;
+    }
+
+    function listHtml(items, target, formatter) {
+      if (items.length === 0) {
+        return '<p class="empty-cat">該当する組はありません。</p>';
+      }
+      var html = '<ol class="results">';
+      for (var i = 0; i < items.length; i++) {
+        html += '<li><span class="expr">' + formatter(items[i], target) + "</span></li>";
+      }
+      html += "</ol>";
+      return html;
+    }
+
+    function render(target, addList, subList) {
+      var box = document.getElementById("results");
+      var html = "";
+
+      html += '<p class="result-input">入力値：' + target + "</p>";
+
+      // どちらにも解が無い場合のまとめ表示
+      if (addList.length === 0 && subList.length === 0) {
+        html += '<div class="none-banner">条件を満たす組はありません</div>';
+      }
+
+      // 式1
+      html += '<div class="cat add">';
+      html += "<h2>【 a " + MUL + " b " + MUL + " c + d = " + target + " 】</h2>";
+      html += '<p class="count">該当件数：' + addList.length + " 件</p>";
+      html += listHtml(addList, target, fmtAdd);
+      html += "</div>";
+
+      // 式2
+      html += '<div class="cat sub">';
+      html += "<h2>【 j " + MUL + " k " + MUL + " l " + MINUS + " m = " + target + " 】</h2>";
+      html += '<p class="count">該当件数：' + subList.length + " 件</p>";
+      html += listHtml(subList, target, fmtSub);
+      html += "</div>";
+
+      box.innerHTML = html;
+    }
+
+    function showError(msg) {
+      var e = document.getElementById("error");
+      e.textContent = msg;
+      e.classList.remove("hidden");
+      document.getElementById("results").innerHTML = ""; // 古い結果は消す
+    }
+
+    function clearError() {
+      var e = document.getElementById("error");
+      e.textContent = "";
+      e.classList.add("hidden");
+    }
+
+    /* =========================================================
+       実行（フォーム submit → Enter キーにも対応）
+       ========================================================= */
+    function run() {
+      var input = document.getElementById("numberInput");
+      var v = validate(input.value);
+      if (!v.ok) {
+        showError(v.msg);
+        return;
+      }
+      clearError();
+      // 計算は一瞬で完了する（最大でも 84通り×9 程度）
+      var addList = searchAdd(v.value);
+      var subList = searchSub(v.value);
+      render(v.value, addList, subList);
+    }
+
+    document.getElementById("searchForm").addEventListener("submit", function (ev) {
+      ev.preventDefault(); // ページ遷移を防ぐ
+      run();
+      // 入力欄は残し、再検索しやすいよう全選択しておく
+      var input = document.getElementById("numberInput");
+      input.focus();
+      input.select();
+    });
+
+    /* =========================================================
+       Service Worker 登録（オフライン対応 / PWA）
+       相対パスで登録（サブディレクトリ公開に対応）
+       ========================================================= */
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./service-worker.js").catch(function (err) {
+          console.warn("Service Worker 登録に失敗:", err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
