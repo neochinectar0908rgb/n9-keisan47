@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <!-- アドレスバー等の色（アプリらしい見た目に） -->
   <meta name="theme-color" content="#4f46e5" />
-  <meta name="description" content="a×b×c+d / j×k×l−m を満たす数字の組をすべて検索するツール" />
+  <meta name="description" content="通常モード（a×b×c+d / j×k×l−m）と積のみモード（a×b×c）で数字の組をすべて検索するツール" />
 
   <!-- PWA マニフェスト（相対パス：GitHub Pages のサブディレクトリでも動く） -->
   <link rel="manifest" href="./manifest.json" />
@@ -78,6 +78,46 @@
       text-align: center;
     }
     .formulas span { display: inline-block; white-space: nowrap; }
+
+    /* ===== モード切替（セグメントボタン） ===== */
+    .mode-switch {
+      display: flex;
+      gap: 6px;
+      background: #e2e8f0;
+      border-radius: 14px;
+      padding: 5px;
+      margin-top: 14px;
+    }
+    .mode-btn {
+      flex: 1;                      /* 2つを均等幅に */
+      min-height: 54px;            /* 指で押しやすい大きさ */
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: #475569;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
+      transition: background .12s, color .12s, box-shadow .12s;
+    }
+    .mode-btn .mode-sub {          /* 補助表記（×××＋/− など） */
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-top: 3px;
+    }
+    /* 選択中のモードを白＋影で強調（一目で分かる） */
+    .mode-btn.active {
+      background: #fff;
+      color: var(--primary-dark);
+      box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    }
+    .mode-btn.active .mode-sub { color: var(--primary); }
 
     /* ===== 入力エリア ===== */
     .panel {
@@ -220,11 +260,25 @@
     <header>
       <h1>数式組合せ検索ツール</h1>
       <p>0〜999 の整数を入れて、条件を満たす組をすべて検索します</p>
-      <div class="formulas">
+      <!-- 説明文（モードに応じて中身を切り替える） -->
+      <div class="formulas" id="formulaBox">
         <span>① a × b × c ＋ d</span>　/　<span>② j × k × l － m</span><br />
         <small>各数字は 1〜9 / 同じ式の中で重複なし</small>
       </div>
     </header>
+
+    <!-- モード切替（セグメントボタン）
+         ・2つ同時選択は不可（どちらか一方だけ active）
+         ・初期状態は通常モード
+         ・切替時に古い結果を消し、説明文も切り替える -->
+    <div class="mode-switch" role="tablist" aria-label="検索モードの切替">
+      <button type="button" class="mode-btn active" id="modeNormal" role="tab" aria-selected="true">
+        通常モード<span class="mode-sub">×××＋／−</span>
+      </button>
+      <button type="button" class="mode-btn" id="modeProduct" role="tab" aria-selected="false">
+        積のみモード<span class="mode-sub">×××</span>
+      </button>
+    </div>
 
     <!-- 入力フォーム：submit で Enter キー検索にも対応
          novalidate: ブラウザ標準の検証を無効化し、独自の日本語エラーを必ず表示する
@@ -309,6 +363,23 @@
       return results;
     }
 
+    /* 積のみモード: a × b × c = target （1〜9 の異なる3個 a<b<c の積）
+       - d・m は使わない（通常モードを d=0,m=0 として流用しない独立処理）
+       - a<b<c のループなので順番違いの重複は出ず、同じ数字の重複も起きない */
+    function searchMul(target) {
+      var results = [];
+      for (var a = MIN; a <= MAX; a++) {
+        for (var b = a + 1; b <= MAX; b++) {
+          for (var c = b + 1; c <= MAX; c++) {
+            if (a * b * c === target) {
+              results.push({ a: a, b: b, c: c });
+            }
+          }
+        }
+      }
+      return results;
+    }
+
     /* =========================================================
        入力チェック
        - 空欄 / 小数 / 文字列 / 負の数 / 1000以上 をエラーに
@@ -347,6 +418,10 @@
     function fmtSub(r, target) {
       return r.a + " " + MUL + " " + r.b + " " + MUL + " " + r.c + " " + MINUS + " " + r.x + " = " + target;
     }
+    // 積のみモード用（「+0」「-0」は付けない）
+    function fmtMul(r, target) {
+      return r.a + " " + MUL + " " + r.b + " " + MUL + " " + r.c + " = " + target;
+    }
 
     function listHtml(items, target, formatter) {
       if (items.length === 0) {
@@ -360,7 +435,8 @@
       return html;
     }
 
-    function render(target, addList, subList) {
+    // 通常モードの表示：足し算型・引き算型を別々の2欄に表示
+    function renderNormal(target, addList, subList) {
       var box = document.getElementById("results");
       var html = "";
 
@@ -371,18 +447,38 @@
         html += '<div class="none-banner">条件を満たす組はありません</div>';
       }
 
-      // 式1
+      // 式1（足し算型）
       html += '<div class="cat add">';
       html += "<h2>【 a " + MUL + " b " + MUL + " c + d = " + target + " 】</h2>";
       html += '<p class="count">該当件数：' + addList.length + " 件</p>";
       html += listHtml(addList, target, fmtAdd);
       html += "</div>";
 
-      // 式2
+      // 式2（引き算型）
       html += '<div class="cat sub">';
       html += "<h2>【 j " + MUL + " k " + MUL + " l " + MINUS + " m = " + target + " 】</h2>";
       html += '<p class="count">該当件数：' + subList.length + " 件</p>";
       html += listHtml(subList, target, fmtSub);
+      html += "</div>";
+
+      box.innerHTML = html;
+    }
+
+    // 積のみモードの表示：結果欄は1つだけ（足し算型・引き算型に分けない）
+    function renderProduct(target, mulList) {
+      var box = document.getElementById("results");
+      var html = "";
+
+      html += '<p class="result-input">入力値：' + target + "</p>";
+
+      if (mulList.length === 0) {
+        html += '<div class="none-banner">条件を満たす組はありません</div>';
+      }
+
+      html += '<div class="cat add">';
+      html += "<h2>【 a " + MUL + " b " + MUL + " c = " + target + " 】</h2>";
+      html += '<p class="count">該当件数：' + mulList.length + " 件</p>";
+      html += listHtml(mulList, target, fmtMul);
       html += "</div>";
 
       box.innerHTML = html;
@@ -402,7 +498,46 @@
     }
 
     /* =========================================================
+       モード管理
+       - "normal"（通常モード）／"product"（積のみモード）
+       - 初期状態は通常モード
+       ========================================================= */
+    var currentMode = "normal";
+
+    // モードごとの説明文（formulaBox に差し込む）
+    var FORMULA_NORMAL =
+      '<span>① a × b × c ＋ d</span>　/　<span>② j × k × l － m</span><br />' +
+      "<small>各数字は 1〜9 / 同じ式の中で重複なし</small>";
+    var FORMULA_PRODUCT =
+      "<span>a × b × c ＝ 入力値</span><br />" +
+      "<small>1〜9 の異なる3個の積（d・m は使いません）</small>";
+
+    function setMode(mode) {
+      currentMode = mode;
+      var isNormal = (mode === "normal");
+      var nBtn = document.getElementById("modeNormal");
+      var pBtn = document.getElementById("modeProduct");
+
+      // 選択中だけ active（同時選択不可・一目で分かる）
+      nBtn.classList.toggle("active", isNormal);
+      pBtn.classList.toggle("active", !isNormal);
+      nBtn.setAttribute("aria-selected", isNormal ? "true" : "false");
+      pBtn.setAttribute("aria-selected", !isNormal ? "true" : "false");
+
+      // 説明文を切り替える
+      document.getElementById("formulaBox").innerHTML = isNormal ? FORMULA_NORMAL : FORMULA_PRODUCT;
+
+      // モード切替時は古い検索結果とエラーを消す
+      document.getElementById("results").innerHTML = "";
+      clearError();
+    }
+
+    document.getElementById("modeNormal").addEventListener("click", function () { setMode("normal"); });
+    document.getElementById("modeProduct").addEventListener("click", function () { setMode("product"); });
+
+    /* =========================================================
        実行（フォーム submit → Enter キーにも対応）
+       現在選択中のモードで検索する
        ========================================================= */
     function run() {
       var input = document.getElementById("numberInput");
@@ -413,9 +548,13 @@
       }
       clearError();
       // 計算は一瞬で完了する（最大でも 84通り×9 程度）
-      var addList = searchAdd(v.value);
-      var subList = searchSub(v.value);
-      render(v.value, addList, subList);
+      if (currentMode === "product") {
+        // 積のみモード：a×b×c を直接検索（d・m は使わない・結果欄は1つ）
+        renderProduct(v.value, searchMul(v.value));
+      } else {
+        // 通常モード：足し算型・引き算型を別々の2欄に表示
+        renderNormal(v.value, searchAdd(v.value), searchSub(v.value));
+      }
     }
 
     document.getElementById("searchForm").addEventListener("submit", function (ev) {
