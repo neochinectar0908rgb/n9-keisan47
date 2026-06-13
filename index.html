@@ -53,23 +53,27 @@
     .wrap {
       max-width: 560px;       /* PC でも読みやすい幅に制限 */
       margin: 0 auto;
-      padding: 16px 16px 48px;
+      /* 上部の余白は最小限に（キーボード表示中でも結果を見やすく） */
+      padding: 8px 14px 40px;
     }
 
-    /* ===== ヘッダー ===== */
-    header { text-align: center; padding: 12px 0 4px; }
-    header h1 {
-      font-size: 1.3rem;
-      margin: 0 0 4px;
-      color: var(--primary-dark);
-    }
-    header p {
-      margin: 0;
-      font-size: 0.85rem;
+    /* ===== 結果より下の「使い方・条件」セクション ===== */
+    .about {
+      margin-top: 26px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
       color: var(--muted);
     }
+    .about h1 {
+      font-size: 1.15rem;
+      margin: 0 0 6px;
+      color: var(--primary-dark);
+      text-align: center;
+    }
+    .about-lead { margin: 0 0 10px; font-size: 0.85rem; text-align: center; }
+    .about-pwa { margin: 10px 0 0; font-size: 0.8rem; text-align: center; }
     .formulas {
-      margin: 10px 0 4px;
+      margin: 8px 0 4px;
       font-size: 0.95rem;
       color: var(--text);
       background: #eef2ff;
@@ -85,14 +89,14 @@
       gap: 4px;
       background: #e2e8f0;
       border-radius: 14px;
-      padding: 5px;
-      margin-top: 14px;
+      padding: 4px;
+      margin-top: 4px;             /* 最上部の要素。余白は最小限に */
     }
     .mode-btn {
       flex: 1 1 0;                  /* 3つを均等幅に（窮屈にならないよう縮小可） */
       min-width: 0;
-      min-height: 56px;            /* 指で押しやすい大きさ */
-      padding: 4px 2px;
+      min-height: 50px;            /* 指で押しやすい大きさは維持しつつ高さ圧縮 */
+      padding: 3px 2px;
       border: none;
       border-radius: 10px;
       background: transparent;
@@ -126,15 +130,15 @@
     .panel {
       background: var(--card);
       border-radius: 16px;
-      padding: 16px;
-      margin-top: 14px;
+      padding: 12px 14px;          /* 上下余白を圧縮 */
+      margin-top: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,.08);
     }
     label.field-label {
       display: block;
       font-weight: 700;
-      margin-bottom: 8px;
-      font-size: 1rem;
+      margin-bottom: 6px;
+      font-size: 0.92rem;
     }
     .input-row { display: flex; gap: 10px; }
     #numberInput {
@@ -168,11 +172,11 @@
     }
     #searchBtn:active { background: var(--primary-dark); transform: translateY(1px); }
 
-    .hint { margin: 8px 2px 0; font-size: 0.8rem; color: var(--muted); }
+    .hint { margin: 6px 2px 0; font-size: 0.8rem; color: var(--muted); }
 
     /* ===== エラー表示 ===== */
     .error {
-      margin-top: 12px;
+      margin-top: 8px;
       padding: 12px 14px;
       background: #fef2f2;
       border: 1px solid #fecaca;
@@ -185,7 +189,7 @@
 
     /* ===== 結果表示 ===== */
     .result-input {
-      margin: 18px 2px 6px;
+      margin: 10px 2px 6px;        /* 入力欄と結果の間を詰める */
       font-size: 1.1rem;
       font-weight: 700;
     }
@@ -203,7 +207,7 @@
       background: var(--card);
       border-radius: 16px;
       padding: 14px 14px 6px;
-      margin-top: 14px;
+      margin-top: 8px;             /* 結果欄の上部余白を圧縮 */
       box-shadow: 0 1px 3px rgba(0,0,0,.08);
       border-top: 5px solid var(--add);
     }
@@ -248,27 +252,14 @@
     }
     ol.results li .expr { white-space: nowrap; overflow-x: auto; }
     .empty-cat { color: var(--muted); padding: 6px 4px 12px; font-size: 0.95rem; }
-
-    footer {
-      text-align: center;
-      margin-top: 28px;
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <header>
-      <h1>数式組合せ検索ツール</h1>
-      <p>0〜999 の整数を入れて、条件を満たす組をすべて検索します</p>
-      <!-- 説明文（モードに応じて中身を切り替える） -->
-      <div class="formulas" id="formulaBox">
-        <span>① a × b × c ＋ d</span>　/　<span>② j × k × l － m</span><br />
-        <small>各数字は 1〜9 / 同じ式の中で重複なし</small>
-      </div>
-    </header>
+    <!-- スマホでキーボード表示中でも結果を見やすくするため、
+         上部には「モード切替・入力・検索・結果」だけを配置する。
+         タイトル・説明・式の解説・PWA説明は、結果欄の下の .about セクションへ移動。 -->
 
     <!-- モード切替（セグメントボタン）
          ・2つ同時選択は不可（どちらか一方だけ active）
@@ -314,9 +305,18 @@
     <!-- 検索結果 -->
     <section id="results" aria-live="polite"></section>
 
-    <footer>
-      オフライン対応・ホーム画面に追加できます（PWA）
-    </footer>
+    <!-- 結果より下：このツールについて／使い方・条件
+         （タイトル・説明・選択中モードの式・条件・PWA説明をここへまとめる） -->
+    <section class="about">
+      <h1>数式組合せ検索ツール</h1>
+      <p class="about-lead">0〜999 の整数を入れて、条件を満たす組をすべて検索します。</p>
+      <!-- 選択中モードの式の説明（モードに応じて中身を切り替える） -->
+      <div class="formulas" id="formulaBox">
+        <span>① a × b × c ＋ d</span>　/　<span>② j × k × l － m</span><br />
+        <small>各数字は 1〜9 / 同じ式の中で重複なし</small>
+      </div>
+      <p class="about-pwa">オフライン対応・ホーム画面に追加できます（PWA）。一度読み込めば電波がなくても使えます。</p>
+    </section>
   </div>
 
   <script>
@@ -627,6 +627,43 @@
     }
 
     /* =========================================================
+       検索後のスクロール調整（スマホ最適化）
+       - キーボードは開いたまま・入力欄のフォーカスも維持する（blur しない）
+       - 結果見出し（件数）がキーボードに隠れている時だけ、
+         入力欄と検索ボタンが画面内に残る範囲で「必要最小限」だけ上へスクロール
+       - visualViewport でキーボードを除いた実際の可視領域を取得する
+       - エラー時・モード切替時には呼ばない（呼び出し側で制御）
+       ========================================================= */
+    function adjustScrollAfterSearch() {
+      // キーボード表示中の実際の表示領域（上端・下端）
+      var vv = window.visualViewport;
+      var viewTop = vv ? vv.offsetTop : 0;
+      var viewBottom = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
+
+      var inputRow = document.querySelector(".input-row");
+      var results = document.getElementById("results");
+      if (!inputRow || !results) return;
+
+      // 見せたい目印＝先頭の「該当件数」（見出し＋件数が見える）。無ければ結果先頭行。
+      var anchor = results.querySelector(".count") ||
+                   results.querySelector(".result-input") || results;
+
+      // 件数行が可視領域の下端より下（＝キーボードに隠れている）なら、その不足分だけ上げたい
+      var need = anchor.getBoundingClientRect().bottom - (viewBottom - 8);
+      if (need <= 0) return; // すでに見えている → スクロールしない
+
+      // 入力欄＋検索ボタンが画面内に残るよう、スクロール量の上限を決める
+      // （これ以上スクロールすると入力行の上端が可視領域の上へ消える）
+      var maxDelta = inputRow.getBoundingClientRect().top - viewTop - 6;
+      if (maxDelta <= 0) return; // これ以上動かすと入力欄が隠れる → スクロールしない
+
+      var delta = Math.min(need, maxDelta);
+      if (delta > 1) {
+        window.scrollBy(0, delta); // 必要最小限・入力欄が残る範囲だけ
+      }
+    }
+
+    /* =========================================================
        実行（フォーム submit → Enter キーにも対応）
        現在選択中のモードで検索する（3モードを明確に分岐）
        ========================================================= */
@@ -635,7 +672,7 @@
       var v = validate(input.value);
       if (!v.ok) {
         showError(v.msg);
-        return;
+        return; // 入力エラー時はスクロールしない
       }
       clearError();
       // 計算は一瞬で完了する（最大でも 84通り×9 程度）
@@ -649,6 +686,8 @@
         // 通常モード：a×b×c+d / j×k×l−m を別々の2欄に表示
         renderNormal(v.value, searchAdd(v.value), searchSub(v.value));
       }
+      // 描画後（レイアウト確定後）に、結果見出しが見えるよう最小限スクロール
+      requestAnimationFrame(adjustScrollAfterSearch);
     }
 
     document.getElementById("searchForm").addEventListener("submit", function (ev) {
