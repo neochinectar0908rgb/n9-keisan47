@@ -1,7 +1,7 @@
 {
   "name": "数式組合せ検索ツール",
   "short_name": "数式検索",
-  "description": "通常モード（a×b×c+d / j×k×l−m）と積のみモード（a×b×c）で数字の組をすべて検索するツール",
+  "description": "通常モード（a×b×c+d / j×k×l−m）・積のみモード（a×b×c）・2数＋／−モード（a×b+d / j×k−m）で数字の組をすべて検索するツール",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
